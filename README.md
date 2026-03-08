@@ -15,6 +15,11 @@ It can be installed as a Python package and run with one-command CLIs.
 ```powershell
 pip install anomalyx==0.1.13
 ```
+## Demo Video
+
+Short demo showing **agent setup, attack simulation, and live dashboard monitoring**.
+
+[![Watch the demo](https://img.shields.io/badge/Watch-Demo-blue?style=for-the-badge&logo=google-drive)](https://drive.google.com/file/d/1rXNQ7FJMxSsrN8BRfoEt0k7hFC0SwA7A/view?usp=sharing)
 
 ## Enterprise UI and Ops
 
