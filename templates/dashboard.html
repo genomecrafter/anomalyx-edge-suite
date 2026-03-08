@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Dashboard</title>
+  <style>
+    :root {
+      --bg:#050d12;
+      --panel:#0c1821;
+      --line:#1c3c48;
+      --text:#e3f2f9;
+      --muted:#94b4c3;
+      --risk:#8ad8ff;
+    }
+    body {
+      font-family: "Segoe UI Variable", "Segoe UI", "Noto Sans", Tahoma, sans-serif;
+      background: radial-gradient(circle at top right, #102a3a, var(--bg));
+      color: var(--text);
+      margin: 0;
+      line-height: 1.45;
+    }
+    .wrap { max-width:1200px; margin:20px auto; padding:0 16px; }
+    .top { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+    .k { font-size:11px; color:var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+    .v { font-size:24px; font-weight:bold; }
+    .grid { display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-top:12px; }
+    .events { max-height:70vh; overflow:auto; }
+    .event {
+      border: 1px solid #17303a;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      background: rgba(10, 23, 33, 0.5);
+    }
+    .event.allow { border-left: 4px solid #2d8356; }
+    .event.alert {
+      border: 2px solid #ff6f6f;
+      border-left-width: 6px;
+      box-shadow: 0 0 0 1px rgba(255, 111, 111, 0.35), 0 0 16px rgba(255, 111, 111, 0.18);
+      background: rgba(124, 24, 24, 0.16);
+    }
+    .event.temp_block_ip {
+      border: 2px solid #ffaf4d;
+      border-left-width: 6px;
+      background: rgba(255, 197, 107, 0.12);
+    }
+    .event.block_ip {
+      border: 2px solid #ff4d4d;
+      border-left-width: 6px;
+      box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.38), 0 0 16px rgba(255, 77, 77, 0.22);
+      background: rgba(150, 18, 18, 0.2);
+    }
+    .event-main { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .risk { color: var(--risk); font-weight: 700; }
+    .layer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 6px 0; }
+    .layer-chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 4px 6px;
+      font-size: 12px;
+      background: rgba(10, 20, 29, 0.7);
+    }
+  </style>
+</head>
+<body data-agent-id="{{ agent_id }}">
+  <div class="wrap">
+    <h2>Agent: {{ agent_id }}</h2>
+    <div class="top" id="stats"></div>
+    <div class="grid">
+      <div class="card events" id="events"></div>
+      <div class="card" id="details"></div>
+    </div>
+  </div>
+
+  <script>
+    const AGENT_ID = document.body.dataset.agentId;
+
+    function actionClass(a) {
+      const x = String(a || '').toLowerCase();
+      if (x === 'block_ip') return 'block_ip';
+      if (x === 'temp_block_ip' || x === 'drop' || x === 'drop_packet') return 'temp_block_ip';
+      if (x.includes('alert')) return 'alert';
+      return 'allow';
+    }
+
+    function toNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function fmtScore(value, scale = 100) {
+      const n = toNumber(value);
+      const normalized = scale === 1 ? (n * 100) : n;
+      return `${normalized.toFixed(1)}`;
+    }
+
+    function render(snapshot) {
+      const status = snapshot.status || {};
+      const actions = status.actions || {};
+      const enf = status.enforcement || {};
+
+      document.getElementById('stats').innerHTML = [
+        ['Running', status.running ? 'YES' : 'NO'],
+        ['Processed', status.processed_packets || 0],
+        ['Alert', actions.alert || 0],
+        ['Temp Block', actions.temp_block_ip || actions.drop_packet || 0],
+        ['Block', actions.block_ip || 0],
+      ].map(([k,v]) => `<div class='card'><div class='k'>${k}</div><div class='v'>${v}</div></div>`).join('');
+
+      document.getElementById('details').innerHTML = `
+        <h3>Runtime</h3>
+        <div class='k'>Last Seen</div><div>${snapshot.last_seen || 'n/a'}</div>
+        <div class='k'>Enforcement Runtime</div><div>${enf.runtime_ok ? 'READY' : 'NOT READY'} (${enf.runtime_message || 'n/a'})</div>
+        <div class='k'>Total Enforced</div><div>${enf.total_enforced || 0}</div>
+        <div class='k'>Failures</div><div>${enf.failed_enforcements || 0}</div>
+        <div class='k'>Skipped</div><div>${enf.skipped_enforcements || 0}</div>
+        <div class='k'>Repeat Suppressed</div><div>${enf.repeat_suppressed || 0}</div>
+        <div class='k'>Controlled Skips</div><div>${enf.controlled_skips || 0}</div>
+      `;
+
+      const events = snapshot.events || [];
+      document.getElementById('events').innerHTML = events.map(ev => {
+        const p = ev.packet || {};
+        const d = ev.decision || {};
+        const zd = ev.zero_day || {};
+        const ml = ev.ml || {};
+        const enf2 = ev.enforcement || {};
+        const act = d.action || 'allow';
+        const decisionLog = d.decision_log || {};
+        const rawScores = decisionLog.raw_scores || {};
+        const sig = ev.signature || {};
+        const sigLayer = rawScores.sig ?? sig.severity ?? 0;
+        const mlLayer = rawScores.ml ?? ml.confidence ?? 0;
+        const zdLayer = rawScores.zd ?? zd.anomaly_score ?? 0;
+
+        return `
+          <div class='event ${actionClass(act)}'>
+            <div class='event-main'>${p.src_ip || 'n/a'}:${p.src_port || '-'} -> ${p.dst_ip || 'n/a'}:${p.dst_port || '-'}</div>
+            <div>action=<b>${act}</b> risk=<span class='risk'>${fmtScore(d.risk)}</span></div>
+            <div class='layer-grid'>
+              <div class='layer-chip'>signature score: <b>${fmtScore(sigLayer)}</b></div>
+              <div class='layer-chip'>ml score: <b>${fmtScore(mlLayer)}</b></div>
+              <div class='layer-chip'>zero-day score: <b>${fmtScore(zdLayer, 1)}</b></div>
+            </div>
+            <div>type=${ml.attack_type || 'normal'} conf=${fmtScore(ml.confidence)}% enforcement=${enf2.status || 'n/a'} ${enf2.rule_name ? '(' + enf2.rule_name + ')' : ''}</div>
+            <div>${ev.timestamp || ''}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function tick() {
+      const res = await fetch('/api/agent/' + encodeURIComponent(AGENT_ID) + '/snapshot');
+      const snapshot = await res.json();
+      render(snapshot);
+    }
+
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

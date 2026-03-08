@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnomalyX Agent Dashboard</title>
+  <style>
+    :root {
+      --bg: #081017;
+      --panel: #0d1a24;
+      --line: #214355;
+      --text: #e3f2f9;
+      --muted: #92b2c2;
+      --ok: #54d59a;
+      --warn: #ffc56b;
+      --alert: #ff6f6f;
+      --danger: #ff4d4d;
+      --risk: #8ad8ff;
+    }
+    body {
+      font-family: "Segoe UI Variable", "Segoe UI", "Noto Sans", Tahoma, sans-serif;
+      background: radial-gradient(circle at top right, #123040, var(--bg));
+      color: var(--text);
+      margin: 0;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1400px; margin: 18px auto; padding: 0 14px; }
+    .headline { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .badge { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .critical { margin-top: 10px; border: 1px solid #6b2e2e; border-radius: 10px; background: rgba(120, 24, 24, 0.25); padding: 12px; min-height: 22px; }
+    .top { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+    .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+    .v { font-size: 24px; font-weight: bold; }
+    .v.alert { color: var(--alert); }
+    .v.warn { color: var(--warn); }
+    .v.danger { color: var(--danger); }
+    .grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 10px; margin-top: 12px; }
+    .events { max-height: 68vh; overflow: auto; }
+    .event {
+      border: 1px solid #16303f;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      background: rgba(10, 23, 33, 0.5);
+    }
+    .event.allow { border-left: 4px solid #2d8356; }
+    .event.alert {
+      border: 2px solid #ff6f6f;
+      border-left-width: 6px;
+      box-shadow: 0 0 0 1px rgba(255, 111, 111, 0.35), 0 0 16px rgba(255, 111, 111, 0.18);
+      background: rgba(124, 24, 24, 0.16);
+    }
+    .event.temp_block_ip {
+      border: 2px solid #ffaf4d;
+      border-left-width: 6px;
+      background: rgba(255, 197, 107, 0.12);
+    }
+    .event.block_ip {
+      border: 2px solid #ff4d4d;
+      border-left-width: 6px;
+      box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.38), 0 0 16px rgba(255, 77, 77, 0.22);
+      background: rgba(150, 18, 18, 0.2);
+    }
+    .event-main { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .risk { color: var(--risk); font-weight: 700; }
+    .layer-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin: 6px 0;
+    }
+    .layer-chip {
+      border: 1px solid #214355;
+      border-radius: 8px;
+      padding: 4px 6px;
+      font-size: 12px;
+      background: rgba(10, 20, 29, 0.7);
+    }
+    .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    select, input, button {
+      background: #0a141d;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: "Segoe UI Variable", "Segoe UI", "Noto Sans", Tahoma, sans-serif;
+      font-size: 13px;
+    }
+    button { cursor: pointer; }
+    .right-grid { display: grid; gap: 10px; }
+    .hot-list { max-height: 200px; overflow: auto; font-size: 12px; }
+    .hot-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+    .hot-table th,
+    .hot-table td {
+      text-align: left;
+      padding: 6px;
+      border-bottom: 1px solid #17303a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: top;
+    }
+    .hot-table th {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-size: 11px;
+      background: #0d1a24;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid #17303a; }
+    .meta { color: var(--muted); font-size: 11px; }
+    .filter-spacer { visibility: hidden; }
+  </style>
+</head>
+<body data-agent-id="{{ agent_id }}">
+  <div class="wrap">
+    <div class="headline">
+      <h2>AnomalyX Agent: <span id="agentId"></span></h2>
+      <div class="badge" id="lastSeenBadge">last_seen=n/a</div>
+    </div>
+
+    <div class="critical" id="criticalStrip">No critical actions yet.</div>
+
+    <div class="top" id="stats"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="filters">
+          <select id="actionFilter">
+            <option value="">all actions</option>
+            <option value="alert">alert</option>
+            <option value="temp_block_ip">temp_block_ip</option>
+            <option value="block_ip">block_ip</option>
+            <option value="allow">allow</option>
+          </select>
+          <select id="enfFilter">
+            <option value="">all enforcement</option>
+            <option value="applied">applied</option>
+            <option value="skipped">skipped</option>
+            <option value="failed">failed</option>
+          </select>
+          <div class="filter-spacer" aria-hidden="true"></div>
+          <div class="filter-spacer" aria-hidden="true"></div>
+        </div>
+        <div class="events" id="events"></div>
+      </div>
+
+      <div class="right-grid">
+        <div class="card" id="details"></div>
+        <div class="card">
+          <h3>Hot Alerts/Blocks</h3>
+          <div class="hot-list" id="hotList"></div>
+        </div>
+        <div class="card">
+          <h3>Unblock IP</h3>
+          <div class="meta">Queue a remote unblock command to the agent.</div>
+          <input id="adminToken" placeholder="admin token" type="password" />
+          <input id="unblockIp" placeholder="remote IP (example 1.1.1.1)" />
+          <button id="unblockBtn" type="button">unblock</button>
+          <div class="meta" id="unblockMsg"></div>
+          <div class="hot-list" id="targetHints"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AGENT_ID = document.body.dataset.agentId;
+    document.getElementById('agentId').textContent = AGENT_ID;
+
+    function htmlEscape(s) {
+      return String(s || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function pickClass(action) {
+      const x = String(action || '').toLowerCase();
+      if (x === 'block_ip') return 'block_ip';
+      if (x === 'temp_block_ip') return 'temp_block_ip';
+      if (x === 'alert') return 'alert';
+      return 'allow';
+    }
+
+    function setStats(status, summary) {
+      const actions = status.actions || {};
+      const enf = status.enforcement || {};
+      const applied = (summary.enforcement || {}).applied || 0;
+      const failed = (summary.enforcement || {}).failed || 0;
+      const alerts = summary.alerts || actions.alert || 0;
+      const tempBlocks = summary.temp_blocks || actions.temp_block_ip || 0;
+      const blocks = summary.blocks || actions.block_ip || 0;
+
+      const cards = [
+        ['Running', status.running ? 'YES' : 'NO', status.running ? 'alert' : 'danger'],
+        ['Processed', status.processed_packets || 0, ''],
+        ['Alerts', alerts, 'alert'],
+        ['Temp Blocks', tempBlocks, 'warn'],
+        ['Blocks', blocks, 'danger'],
+        ['Enforced', applied, 'ok'],
+        ['Enf Failures', failed || enf.failed_enforcements || 0, 'danger'],
+      ];
+      document.getElementById('stats').innerHTML = cards.map(([k, v, cls]) => (
+        `<div class='card'><div class='k'>${k}</div><div class='v ${cls}'>${v}</div></div>`
+      )).join('');
+    }
+
+    function setCriticalStrip(events) {
+      const critical = events.find(ev => {
+        const act = String((ev.decision || {}).action || '').toLowerCase();
+        const enf = String((ev.enforcement || {}).status || '').toLowerCase();
+        const risk = Number((ev.decision || {}).risk || 0);
+        return act === 'block_ip' || act === 'temp_block_ip' || risk >= 80 || enf === 'failed';
+      });
+      const strip = document.getElementById('criticalStrip');
+      if (!critical) {
+        strip.textContent = 'No critical actions yet.';
+        return;
+      }
+      const d = critical.decision || {};
+      const p = critical.packet || {};
+      const e = critical.enforcement || {};
+      strip.innerHTML = `CRITICAL: action=${htmlEscape(d.action)} risk=${htmlEscape(d.risk)} ` +
+        `src=${htmlEscape(p.src_ip)} dst=${htmlEscape(p.dst_ip)} enf=${htmlEscape(e.status)} details=${htmlEscape(e.details)}`;
+    }
+
+    function setDetails(snapshot) {
+      const status = snapshot.status || {};
+      const enf = status.enforcement || {};
+      document.getElementById('details').innerHTML = `
+        <h3>Runtime</h3>
+        <div class='k'>last seen</div><div>${htmlEscape(snapshot.last_seen || 'n/a')}</div>
+        <div class='k'>capture error</div><div>${htmlEscape(status.capture_error || 'none')}</div>
+        <div class='k'>enforcement runtime</div><div>${enf.runtime_ok ? 'READY' : 'NOT READY'} (${htmlEscape(enf.runtime_message || 'n/a')})</div>
+        <div class='k'>total enforced</div><div>${htmlEscape(enf.total_enforced || 0)}</div>
+        <div class='k'>skipped</div><div>${htmlEscape(enf.skipped_enforcements || 0)}</div>
+        <div class='k'>repeat suppressed</div><div>${htmlEscape(enf.repeat_suppressed || 0)}</div>
+      `;
+    }
+
+    function toNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function fmtScore(value) {
+      const n = toNumber(value);
+      const bounded = Math.max(0, Math.min(100, n));
+      return `${bounded.toFixed(1)}`;
+    }
+
+    function setEvents(events) {
+      const root = document.getElementById('events');
+      root.innerHTML = events.map(ev => {
+        const p = ev.packet || {};
+        const d = ev.decision || {};
+        const decisionLog = d.decision_log || {};
+        const rawScores = decisionLog.raw_scores || {};
+        const ml = ev.ml || {};
+        const sig = ev.signature || {};
+        const zd = ev.zero_day || {};
+        const e = ev.enforcement || {};
+        const act = String(d.action || 'allow').toLowerCase();
+
+        const sigLayer = rawScores.sig ?? sig.severity ?? 0;
+        const mlLayer = rawScores.ml ?? ml.confidence ?? 0;
+        const zdLayer = rawScores.zd ?? zd.anomaly_score ?? 0;
+
+        return `
+          <div class='event ${pickClass(act)}'>
+            <div class='event-main'>${htmlEscape(p.src_ip)}:${htmlEscape(p.src_port || '-')} -> ${htmlEscape(p.dst_ip)}:${htmlEscape(p.dst_port || '-')}</div>
+            <div>action=<b>${htmlEscape(act)}</b> risk=<span class='risk'>${htmlEscape(fmtScore(d.risk))}</span> ml=${htmlEscape(ml.attack_type)} (${htmlEscape(fmtScore(ml.confidence))}%)</div>
+            <div class='layer-grid'>
+              <div class='layer-chip'>signature score: <b>${htmlEscape(fmtScore(sigLayer))}</b></div>
+              <div class='layer-chip'>ml score: <b>${htmlEscape(fmtScore(mlLayer))}</b></div>
+              <div class='layer-chip'>zero-day score: <b>${htmlEscape(fmtScore(zdLayer))}</b></div>
+            </div>
+            <div>enforcement=${htmlEscape(e.status)} ${e.rule_name ? '(' + htmlEscape(e.rule_name) + ')' : ''}</div>
+            <div class='meta'>${htmlEscape(ev.timestamp || '')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setHotLists(events) {
+      const hot = events.filter(ev => {
+        const act = String((ev.decision || {}).action || '').toLowerCase();
+        return act === 'alert' || act === 'temp_block_ip' || act === 'block_ip';
+      }).slice(0, 40);
+
+      if (!hot.length) {
+        document.getElementById('hotList').innerHTML = '<div class="meta">No alert/block traffic yet.</div>';
+      } else {
+        const rows = hot.map(ev => {
+          const p = ev.packet || {};
+          const d = ev.decision || {};
+          const action = String(d.action || '').replaceAll('_', ' ');
+          const risk = d.risk ?? 0;
+          const status = (ev.enforcement || {}).status || 'n/a';
+          const ip = (p.traffic_source || {}).remote_ip || p.dst_ip || p.src_ip || 'n/a';
+          return `<tr><td>${htmlEscape(action)}</td><td>${htmlEscape(risk)}</td><td>${htmlEscape(status)}</td><td>${htmlEscape(ip)}</td></tr>`;
+        }).join('');
+
+        document.getElementById('hotList').innerHTML = `
+          <table class='hot-table'>
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Risk</th>
+                <th>Enforcement</th>
+                <th>Remote IP</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+
+      const targets = new Map();
+      for (const ev of hot) {
+        const e = ev.enforcement || {};
+        if (String(e.status || '').toLowerCase() !== 'applied') continue;
+        const ip = String(e.remote_ip || '').trim();
+        if (!ip) continue;
+        targets.set(ip, (targets.get(ip) || 0) + 1);
+      }
+      const sorted = [...targets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+      document.getElementById('targetHints').innerHTML = sorted.map(([ip, cnt]) => (
+        `<div class='row'><span>${htmlEscape(ip)}</span><span>applied=${cnt}</span></div>`
+      )).join('') || '<div class="meta">No applied targets yet.</div>';
+    }
+
+    async function fetchFilteredEvents() {
+      const params = new URLSearchParams();
+      params.set('limit', '160');
+      const actionFilter = document.getElementById('actionFilter').value;
+      const enfFilter = document.getElementById('enfFilter').value;
+      if (actionFilter) params.set('action', actionFilter);
+      if (enfFilter) params.set('enforcement', enfFilter);
+
+      const res = await fetch('/api/agent/' + encodeURIComponent(AGENT_ID) + '/events?' + params.toString());
+      if (!res.ok) return [];
+      const body = await res.json();
+      return body.events || [];
+    }
+
+    async function enqueueUnblock() {
+      const ip = document.getElementById('unblockIp').value.trim();
+      const token = document.getElementById('adminToken').value;
+      const msg = document.getElementById('unblockMsg');
+      if (!ip) {
+        msg.textContent = 'remote IP required';
+        return;
+      }
+      const res = await fetch('/api/agent/' + encodeURIComponent(AGENT_ID) + '/command/unblock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Token': token,
+        },
+        body: JSON.stringify({ remote_ip: ip, reason: 'ui_unblock' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        msg.textContent = `queued unblock for ${ip}`;
+      } else {
+        msg.textContent = `failed: ${body.error || 'unknown_error'}`;
+      }
+    }
+
+    async function tick() {
+      const snapRes = await fetch('/api/agent/' + encodeURIComponent(AGENT_ID) + '/snapshot');
+      const snapshot = await snapRes.json();
+      const status = snapshot.status || {};
+      const summary = snapshot.summary || {};
+
+      document.getElementById('lastSeenBadge').textContent = `last_seen=${snapshot.last_seen || 'n/a'}`;
+      setStats(status, summary);
+      setDetails(snapshot);
+
+      const events = await fetchFilteredEvents();
+      setEvents(events);
+      setCriticalStrip(events);
+      setHotLists(events);
+    }
+
+    document.getElementById('actionFilter').addEventListener('change', tick);
+    document.getElementById('enfFilter').addEventListener('change', tick);
+    document.getElementById('unblockBtn').addEventListener('click', enqueueUnblock);
+
+    tick();
+    setInterval(tick, 2500);
+  </script>
+</body>
+</html>

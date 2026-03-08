@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hybrid IPS Public Monitor</title>
+  <style>
+    body { font-family: Consolas, monospace; background:#071018; color:#dff; margin:0; }
+    .wrap { max-width:900px; margin:50px auto; padding:20px; }
+    .card { background:#0b1620; border:1px solid #1f4450; border-radius:14px; padding:20px; }
+    input { width:100%; padding:12px; background:#09131b; color:#dff; border:1px solid #2b5a66; border-radius:8px; }
+    button { margin-top:12px; padding:10px 16px; border:0; border-radius:8px; background:#11b3c7; color:#022; font-weight:bold; cursor:pointer; }
+    .list { margin-top:18px; }
+    .row { padding:10px; border-bottom:1px solid #16313a; }
+    a { color:#75e8ff; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Hybrid IDS+IPS Public Monitor</h2>
+      <p>Enter the unique agent ID to open the live monitoring dashboard.</p>
+      <input id="agentId" placeholder="e.g. win-vm-001" />
+      <button onclick="openDash()">Open Dashboard</button>
+      <div class="list" id="agents"></div>
+    </div>
+  </div>
+
+  <script>
+    function openDash() {
+      const id = document.getElementById('agentId').value.trim();
+      if (!id) return;
+      window.location.href = '/dashboard/' + encodeURIComponent(id);
+    }
+
+    async function loadAgents() {
+      const res = await fetch('/api/agents');
+      const data = await res.json();
+      const root = document.getElementById('agents');
+      root.innerHTML = '<h3>Known Agents</h3>' + (data.agents || []).map(a =>
+        `<div class="row"><a href="/dashboard/${a.agent_id}">${a.agent_id}</a> | processed=${a.processed_packets} | last_seen=${a.last_seen || 'n/a'}</div>`
+      ).join('');
+    }
+
+    loadAgents();
+    setInterval(loadAgents, 5000);
+  </script>
+</body>
+</html>

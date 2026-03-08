@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anomalyx"
+version = "0.1.13"
+description = "Standalone hybrid IDS+IPS for Ubuntu/Windows VMs with relay dashboard"
+readme = "README_PYPI.md"
+requires-python = ">=3.10"
+dependencies = [
+  "flask==2.3.3",
+  "requests==2.31.0",
+  "waitress==3.0.0",
+  "scapy>=2.5.0",
+  "joblib>=1.3.0",
+  "numpy>=1.24.0",
+  "pandas>=1.5.0",
+]
+
+[project.scripts]
+anomalyx = "cli:main"
+anomalyx-setup = "bootstrap:main"
+anomalyx-review-enforcement = "ops_tools:main"
+anomalyx-agent = "agent_runner:main"
+anomalyx-dashboard = "dashboard_server:main"
+edge-agent = "agent_runner:main"
+edge-dashboard = "dashboard_server:main"
+
+[tool.setuptools]
+packages = ["anomalyx_core", "anomalyx_core.ips", "anomalyx_core.models", "anomalyx_core.templates"]
+py-modules = ["agent_runner", "dashboard_server", "cli", "bootstrap", "ops_tools"]
+
+[tool.setuptools.package-data]
+anomalyx_core = ["templates/*.html"]
+"anomalyx_core.models" = ["*.pkl"]

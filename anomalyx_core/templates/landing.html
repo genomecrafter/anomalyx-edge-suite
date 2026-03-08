@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hybrid IPS Public Monitor</title>
+  <style>
+    body { font-family: Consolas, monospace; background:#071018; color:#dff; margin:0; }
+    .wrap { max-width:1100px; margin:50px auto; padding:20px; }
+    .card { background:#0b1620; border:1px solid #1f4450; border-radius:14px; padding:20px; }
+    input { width:100%; padding:12px; background:#09131b; color:#dff; border:1px solid #2b5a66; border-radius:8px; }
+    button { margin-top:12px; padding:10px 16px; border:0; border-radius:8px; background:#11b3c7; color:#022; font-weight:bold; cursor:pointer; }
+    .list { margin-top:18px; }
+    .row { padding:10px; border-bottom:1px solid #16313a; display:grid; grid-template-columns: 1.1fr .9fr .6fr .5fr .5fr .5fr .7fr; gap:10px; align-items:center; }
+    .header { color:#96d4e4; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    .ok { color:#63d491; }
+    .down { color:#ff8d8d; }
+    a { color:#75e8ff; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Hybrid IDS+IPS Public Monitor</h2>
+      <p>Enter the unique agent ID to open the live monitoring dashboard.</p>
+      <input id="agentId" placeholder="e.g. win-vm-001" />
+      <button onclick="openDash()">Open Dashboard</button>
+      <div class="list" id="agents"></div>
+    </div>
+  </div>
+
+  <script>
+    function openDash() {
+      const id = document.getElementById('agentId').value.trim();
+      if (!id) return;
+      window.location.href = '/dashboard/' + encodeURIComponent(id);
+    }
+
+    async function loadAgents() {
+      const res = await fetch('/api/agents');
+      const data = await res.json();
+      const root = document.getElementById('agents');
+      const rows = (data.agents || []).map(a => {
+        const running = a.running ? '<span class="ok">RUNNING</span>' : '<span class="down">STOPPED</span>';
+        return `
+          <div class="row">
+            <a href="/dashboard/${a.agent_id}">${a.agent_id}</a>
+            <span>${a.last_seen || 'n/a'}</span>
+            <span>${a.processed_packets || 0}</span>
+            <span>${a.alerts || 0}</span>
+            <span>${a.temp_blocks || 0}</span>
+            <span>${a.blocks || 0}</span>
+            <span>${running}</span>
+          </div>
+        `;
+      }).join('');
+
+      root.innerHTML = `
+        <h3>Known Agents</h3>
+        <div class="row header">
+          <span>Agent</span><span>Last Seen</span><span>Processed</span><span>Alerts</span><span>Temp Block</span><span>Block</span><span>Status</span>
+        </div>
+        ${rows || '<div class="row"><span>No agents yet.</span></div>'}
+      `;
+    }
+
+    loadAgents();
+    setInterval(loadAgents, 5000);
+  </script>
+</body>
+</html>

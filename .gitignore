@@ -1,0 +1,10 @@
+@"
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+anomalyx-logs/
+.env
+"@ | Out-File -Encoding utf8 .gitignore
