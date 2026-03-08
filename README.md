@@ -8,6 +8,14 @@ It provides:
 
 It can be installed as a Python package and run with one-command CLIs.
 
+## PyPI Package
+
+- Package link: https://pypi.org/project/anomalyx/0.1.13/
+
+```powershell
+pip install anomalyx==0.1.13
+```
+
 ## Enterprise UI and Ops
 
 - High-signal dashboard widgets for `alerts`, `temp_block_ip`, `block_ip`, and enforcement failures.
